@@ -1624,12 +1624,40 @@ export interface Resource<T> {
 }
 
 // @public
-export function resource<T, R>(options: ResourceOptions<T, R> & {
+export function resource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(options: ResourceOptions<T, R | null> & {
+    params: P;
+    defaultValue: NoInfer<T>;
+} & ([
+undefined
+] extends [P] ? {} : never) & ([P] extends [undefined] ? never : {})): ResourceRef<T>;
+
+// @public
+export function resource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(options: ResourceOptions<T, R | null> & {
+    params: P;
+} & ([undefined] extends [P] ? {} : never) & ([P] extends [undefined] ? never : {})): ResourceRef<T | undefined>;
+
+// @public
+export function resource<T, R = null>(options: ResourceOptions<T, R | null> & {
+    params: undefined;
     defaultValue: NoInfer<T>;
 }): ResourceRef<T>;
 
 // @public
-export function resource<T, R>(options: ResourceOptions<T, R>): ResourceRef<T | undefined>;
+export function resource<T, R = null>(options: ResourceOptions<T, R | null> & {
+    params: undefined;
+}): ResourceRef<T | undefined>;
+
+// @public
+export function resource<T, R = null>(options: ResourceOptions<T, R> & {
+    defaultValue: NoInfer<T>;
+} & ([R] extends [null] ? {} : {
+    params: (ctx: ResourceParamsContext) => R;
+})): ResourceRef<T>;
+
+// @public
+export function resource<T, R = null>(options: ResourceOptions<T, R> & ([R] extends [null] ? {} : {
+    params: (ctx: ResourceParamsContext) => R;
+})): ResourceRef<T | undefined>;
 
 // @public
 export class ResourceDependencyError extends Error {

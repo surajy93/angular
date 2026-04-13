@@ -240,7 +240,7 @@ describe('resource', () => {
   });
 
   it('should not trigger consumers on every value change via hasValue()', async () => {
-    const testResource = resource<number | undefined, unknown>({
+    const testResource = resource<number | undefined>({
       loader: () => Promise.resolve(undefined),
       injector: TestBed.inject(Injector),
     });
@@ -1102,6 +1102,126 @@ describe('resource', () => {
       } else if (readonly.error()) {
       }
     });
+  });
+});
+
+describe('types', () => {
+  it('should type loader params as string | null when params option can be undefined', () => {
+    function getParams(): (() => string) | undefined {
+      return Math.random() > 0.5 ? () => 'test' : undefined;
+    }
+
+    resource({
+      params: getParams(),
+      loader: async ({params}) => {
+        const _strOrNull: string | null = params;
+        return '';
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type loader params as number | null when numeric params option can be undefined', () => {
+    function getParams(): (() => number) | undefined {
+      return Math.random() > 0.5 ? () => 0 : undefined;
+    }
+
+    resource({
+      params: getParams(),
+      loader: async ({params}) => {
+        const _numOrNull: number | null = params;
+        return '';
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type loader params as string | null with defaultValue when params option can be undefined', () => {
+    function getParams(): (() => string) | undefined {
+      return Math.random() > 0.5 ? () => 'test' : undefined;
+    }
+
+    const res = resource({
+      params: getParams(),
+      loader: async ({params}) => {
+        const _strOrNull: string | null = params;
+        return '';
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    // With defaultValue, the resource value type should not include undefined
+    const _value: string = res.value();
+  });
+
+  it('should type loader params as string | null when params is explicitly undefined with explicit generics', () => {
+    resource<string, string>({
+      params: undefined,
+      loader: async ({params}) => {
+        const _strOrNull: string | null = params;
+        return '';
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type loader params as string | null with defaultValue when params is explicitly undefined', () => {
+    const res = resource<string, string>({
+      params: undefined,
+      loader: async ({params}) => {
+        const _strOrNull: string | null = params;
+        return '';
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+
+  it('should type loader params as null when no params option is provided', () => {
+    resource({
+      loader: async ({params}) => {
+        const _null: null = params;
+        return '';
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type loader params as null with defaultValue when no params option is provided', () => {
+    const res = resource({
+      loader: async ({params}) => {
+        const _null: null = params;
+        return '';
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+
+  it('should type loader params as null when params is explicitly undefined without generics', () => {
+    resource({
+      params: undefined,
+      loader: async ({params}) => {
+        const _null: null = params;
+        return '';
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type loader params as null with defaultValue when params is explicitly undefined without generics', () => {
+    const res = resource({
+      params: undefined,
+      loader: async ({params}) => {
+        const _null: null = params;
+        return '';
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
   });
 });
 

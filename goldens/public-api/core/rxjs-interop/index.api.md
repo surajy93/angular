@@ -19,12 +19,40 @@ export function outputToObservable<T>(ref: OutputRef<T>): Observable<T>;
 export function pendingUntilEvent<T>(injector?: Injector): MonoTypeOperatorFunction<T>;
 
 // @public
-export function rxResource<T, R>(opts: RxResourceOptions<T, R> & {
+export function rxResource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(opts: RxResourceOptions<T, R | null> & {
+    params: P;
+    defaultValue: NoInfer<T>;
+} & ([
+undefined
+] extends [P] ? {} : never) & ([P] extends [undefined] ? never : {})): ResourceRef<T>;
+
+// @public
+export function rxResource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(opts: RxResourceOptions<T, R | null> & {
+    params: P;
+} & ([undefined] extends [P] ? {} : never) & ([P] extends [undefined] ? never : {})): ResourceRef<T | undefined>;
+
+// @public
+export function rxResource<T, R = null>(opts: RxResourceOptions<T, R | null> & {
+    params: undefined;
     defaultValue: NoInfer<T>;
 }): ResourceRef<T>;
 
 // @public
-export function rxResource<T, R>(opts: RxResourceOptions<T, R>): ResourceRef<T | undefined>;
+export function rxResource<T, R = null>(opts: RxResourceOptions<T, R | null> & {
+    params: undefined;
+}): ResourceRef<T | undefined>;
+
+// @public
+export function rxResource<T, R = null>(opts: RxResourceOptions<T, R> & {
+    defaultValue: NoInfer<T>;
+} & ([R] extends [null] ? {} : {
+    params: (ctx: ResourceParamsContext) => R;
+})): ResourceRef<T>;
+
+// @public
+export function rxResource<T, R = null>(opts: RxResourceOptions<T, R> & ([R] extends [null] ? {} : {
+    params: (ctx: ResourceParamsContext) => R;
+})): ResourceRef<T | undefined>;
 
 // @public
 export interface RxResourceOptions<T, R> extends BaseResourceOptions<T, R> {

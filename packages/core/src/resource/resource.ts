@@ -35,6 +35,61 @@ import {PendingTasks} from '../pending_tasks';
 import {linkedSignal} from '../render3/reactivity/linked_signal';
 
 /**
+ * Overload for when `params` may be `undefined` at runtime (e.g. `params: getParams()` where
+ * `getParams()` returns `(() => R) | undefined`). The loader/stream receives `null` for `params`
+ * when the params function is absent.
+ *
+ * @experimental 19.0
+ */
+export function resource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(
+  options: ResourceOptions<T, R | null> & {params: P; defaultValue: NoInfer<T>} & ([
+      undefined,
+    ] extends [P]
+      ? {}
+      : never) &
+    ([P] extends [undefined] ? never : {}),
+): ResourceRef<T>;
+
+/**
+ * Overload for when `params` may be `undefined` at runtime (e.g. `params: getParams()` where
+ * `getParams()` returns `(() => R) | undefined`). The loader/stream receives `null` for `params`
+ * when the params function is absent.
+ *
+ * @experimental 19.0
+ */
+export function resource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(
+  options: ResourceOptions<T, R | null> & {params: P} & ([undefined] extends [P] ? {} : never) &
+    ([P] extends [undefined] ? never : {}),
+): ResourceRef<T | undefined>;
+
+/**
+ * Constructs a `Resource` that projects a reactive request to an asynchronous operation defined by
+ * a loader function, which exposes the result of the loading operation via signals.
+ *
+ * This overload handles the case when `params` is explicitly `undefined` (e.g.
+ * `resource<string, string>({params: undefined, ...})`). The loader/stream receives `R | null`
+ * for `params`.
+ *
+ * @experimental 19.0
+ */
+export function resource<T, R = null>(
+  options: ResourceOptions<T, R | null> & {params: undefined; defaultValue: NoInfer<T>},
+): ResourceRef<T>;
+
+/**
+ * Constructs a `Resource` that projects a reactive request to an asynchronous operation defined by
+ * a loader function, which exposes the result of the loading operation via signals.
+ *
+ * This overload handles the case when `params` is explicitly `undefined`. The loader/stream
+ * receives `R | null` for `params`.
+ *
+ * @experimental 19.0
+ */
+export function resource<T, R = null>(
+  options: ResourceOptions<T, R | null> & {params: undefined},
+): ResourceRef<T | undefined>;
+
+/**
  * Constructs a `Resource` that projects a reactive request to an asynchronous operation defined by
  * a loader function, which exposes the result of the loading operation via signals.
  *
@@ -46,8 +101,10 @@ import {linkedSignal} from '../render3/reactivity/linked_signal';
  *
  * @experimental 19.0
  */
-export function resource<T, R>(
-  options: ResourceOptions<T, R> & {defaultValue: NoInfer<T>},
+export function resource<T, R = null>(
+  options: ResourceOptions<T, R> & {defaultValue: NoInfer<T>} & ([R] extends [null]
+      ? {}
+      : {params: (ctx: ResourceParamsContext) => R}),
 ): ResourceRef<T>;
 
 /**
@@ -61,23 +118,29 @@ export function resource<T, R>(
  * @experimental 19.0
  * @see [Async reactivity with resources](guide/signals/resource)
  */
-export function resource<T, R>(options: ResourceOptions<T, R>): ResourceRef<T | undefined>;
-export function resource<T, R>(options: ResourceOptions<T, R>): ResourceRef<T | undefined> {
+export function resource<T, R = null>(
+  options: ResourceOptions<T, R> &
+    ([R] extends [null] ? {} : {params: (ctx: ResourceParamsContext) => R}),
+): ResourceRef<T | undefined>;
+export function resource<T, R>(
+  options: ResourceOptions<T, R> | ResourceOptions<T, R | null>,
+): ResourceRef<T | undefined> {
   if (ngDevMode && !options?.injector) {
     assertInInjectionContext(resource);
   }
 
+  const opts = options as ResourceOptions<T, R>;
   const oldNameForParams = (
-    options as ResourceOptions<T, R> & {request: ResourceOptions<T, R>['params']}
+    opts as ResourceOptions<T, R> & {request: ResourceOptions<T, R>['params']}
   ).request;
-  const params = options.params ?? oldNameForParams ?? (() => null!);
+  const params = opts.params ?? oldNameForParams ?? (() => null!);
   return new ResourceImpl<T | undefined, R>(
     params,
-    getLoader(options),
-    options.defaultValue,
-    options.equal ? wrapEqualityFn(options.equal) : undefined,
-    options.debugName,
-    options.injector ?? inject(Injector),
+    getLoader(opts),
+    opts.defaultValue,
+    opts.equal ? wrapEqualityFn(opts.equal) : undefined,
+    opts.debugName,
+    opts.injector ?? inject(Injector),
   );
 }
 

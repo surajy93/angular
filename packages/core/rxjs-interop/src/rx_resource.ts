@@ -12,6 +12,7 @@ import {
   BaseResourceOptions,
   resource,
   ResourceLoaderParams,
+  ResourceParamsContext,
   ResourceRef,
   ResourceStreamItem,
   Signal,
@@ -31,6 +32,60 @@ export interface RxResourceOptions<T, R> extends BaseResourceOptions<T, R> {
 }
 
 /**
+ * Overload for when `params` may be `undefined` at runtime (e.g. `params: getParams()` where
+ * `getParams()` returns `(() => R) | undefined`). The stream receives `null` for `params`
+ * when the params function is absent.
+ *
+ * @experimental
+ */
+export function rxResource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(
+  opts: RxResourceOptions<T, R | null> & {params: P; defaultValue: NoInfer<T>} & ([
+      undefined,
+    ] extends [P]
+      ? {}
+      : never) &
+    ([P] extends [undefined] ? never : {}),
+): ResourceRef<T>;
+
+/**
+ * Overload for when `params` may be `undefined` at runtime (e.g. `params: getParams()` where
+ * `getParams()` returns `(() => R) | undefined`). The stream receives `null` for `params`
+ * when the params function is absent.
+ *
+ * @experimental
+ */
+export function rxResource<T, R, P extends ((ctx: ResourceParamsContext) => R) | undefined>(
+  opts: RxResourceOptions<T, R | null> & {params: P} & ([undefined] extends [P] ? {} : never) &
+    ([P] extends [undefined] ? never : {}),
+): ResourceRef<T | undefined>;
+
+/**
+ * Like `resource` but uses an RxJS based `loader` which maps the request to an `Observable` of the
+ * resource's value.
+ *
+ * This overload handles the case when `params` is explicitly `undefined`. The stream receives
+ * `R | null` for `params`.
+ *
+ * @experimental
+ */
+export function rxResource<T, R = null>(
+  opts: RxResourceOptions<T, R | null> & {params: undefined; defaultValue: NoInfer<T>},
+): ResourceRef<T>;
+
+/**
+ * Like `resource` but uses an RxJS based `loader` which maps the request to an `Observable` of the
+ * resource's value.
+ *
+ * This overload handles the case when `params` is explicitly `undefined`. The stream receives
+ * `R | null` for `params`.
+ *
+ * @experimental
+ */
+export function rxResource<T, R = null>(
+  opts: RxResourceOptions<T, R | null> & {params: undefined},
+): ResourceRef<T | undefined>;
+
+/**
  * Like `resource` but uses an RxJS based `loader` which maps the request to an `Observable` of the
  * resource's value.
  *
@@ -38,8 +93,10 @@ export interface RxResourceOptions<T, R> extends BaseResourceOptions<T, R> {
  *
  * @experimental
  */
-export function rxResource<T, R>(
-  opts: RxResourceOptions<T, R> & {defaultValue: NoInfer<T>},
+export function rxResource<T, R = null>(
+  opts: RxResourceOptions<T, R> & {defaultValue: NoInfer<T>} & ([R] extends [null]
+      ? {}
+      : {params: (ctx: ResourceParamsContext) => R}),
 ): ResourceRef<T>;
 
 /**
@@ -48,15 +105,20 @@ export function rxResource<T, R>(
  *
  * @experimental
  */
-export function rxResource<T, R>(opts: RxResourceOptions<T, R>): ResourceRef<T | undefined>;
-export function rxResource<T, R>(opts: RxResourceOptions<T, R>): ResourceRef<T | undefined> {
+export function rxResource<T, R = null>(
+  opts: RxResourceOptions<T, R> &
+    ([R] extends [null] ? {} : {params: (ctx: ResourceParamsContext) => R}),
+): ResourceRef<T | undefined>;
+export function rxResource<T, R>(
+  opts: RxResourceOptions<T, R> | RxResourceOptions<T, R | null>,
+): ResourceRef<T | undefined> {
   if (ngDevMode && !opts?.injector) {
     assertInInjectionContext(rxResource);
   }
-  return resource<T, R>({
-    ...opts,
+  return (resource as Function)({
+    ...(opts as RxResourceOptions<T, R>),
     loader: undefined,
-    stream: (params) => {
+    stream: (params: ResourceLoaderParams<R>) => {
       let sub: Subscription | undefined;
 
       // Track the abort listener so it can be removed if the Observable completes (as a memory

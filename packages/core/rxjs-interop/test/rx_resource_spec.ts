@@ -178,6 +178,125 @@ describe('rxResource()', () => {
   });
 });
 
+describe('types', () => {
+  it('should type stream params as string | null when params option can be undefined', () => {
+    function getParams(): (() => string) | undefined {
+      return Math.random() > 0.5 ? () => 'test' : undefined;
+    }
+
+    rxResource({
+      params: getParams(),
+      stream: ({params}) => {
+        const _strOrNull: string | null = params;
+        return of('');
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type stream params as number | null when numeric params option can be undefined', () => {
+    function getParams(): (() => number) | undefined {
+      return Math.random() > 0.5 ? () => 0 : undefined;
+    }
+
+    rxResource({
+      params: getParams(),
+      stream: ({params}) => {
+        const _numOrNull: number | null = params;
+        return of('');
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type stream params as string | null with defaultValue when params option can be undefined', () => {
+    function getParams(): (() => string) | undefined {
+      return Math.random() > 0.5 ? () => 'test' : undefined;
+    }
+
+    const res = rxResource({
+      params: getParams(),
+      stream: ({params}) => {
+        const _strOrNull: string | null = params;
+        return of('');
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+
+  it('should type stream params as string | null when params is explicitly undefined with explicit generics', () => {
+    rxResource<string, string>({
+      params: undefined,
+      stream: ({params}) => {
+        const _strOrNull: string | null = params;
+        return of('');
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type stream params as string | null with defaultValue when params is explicitly undefined', () => {
+    const res = rxResource<string, string>({
+      params: undefined,
+      stream: ({params}) => {
+        const _strOrNull: string | null = params;
+        return of('');
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+
+  it('should type stream params as null when no params option is provided', () => {
+    rxResource({
+      stream: ({params}) => {
+        const _null: null = params;
+        return of('');
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type stream params as null with defaultValue when no params option is provided', () => {
+    const res = rxResource({
+      stream: ({params}) => {
+        const _null: null = params;
+        return of('');
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+
+  it('should type stream params as null when params is explicitly undefined without generics', () => {
+    rxResource({
+      params: undefined,
+      stream: ({params}) => {
+        const _null: null = params;
+        return of('');
+      },
+      injector: TestBed.inject(Injector),
+    });
+  });
+
+  it('should type stream params as null with defaultValue when params is explicitly undefined without generics', () => {
+    const res = rxResource({
+      params: undefined,
+      stream: ({params}) => {
+        const _null: null = params;
+        return of('');
+      },
+      defaultValue: '',
+      injector: TestBed.inject(Injector),
+    });
+    const _value: string = res.value();
+  });
+});
+
 async function waitFor(fn: () => boolean): Promise<void> {
   while (!fn()) {
     await timeout(1);

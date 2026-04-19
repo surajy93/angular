@@ -9402,6 +9402,128 @@ runInEachFileSystem((os: string) => {
         const diags = env.driveDiagnostics();
         expect(diags.length).toBe(0);
       });
+
+      it('should not reinitialize a `declare` field in a child @Directive (AOT path)', () => {
+        env.tsconfig();
+        env.write(
+          'test.ts',
+          `
+    import {Directive} from '@angular/core';
+
+    @Directive({})
+    export class Base {
+      prop: string|number = 'report';
+    }
+
+    @Directive({selector: '[child]'})
+    export class Child extends Base {
+      declare prop: number;
+    }
+  `,
+        );
+
+        env.driveMain();
+
+        // A `declare` field is type-only and must not produce any initializer
+        // in the compiled output. If the Ambient NodeFlag is not preserved
+        // across updatePropertyDeclaration(), TypeScript treats the field as
+        // a regular initializer and emits `this.prop = void 0`, which silently
+        // overwrites the value set by the parent constructor.
+        const jsContents = env.getContents('test.js');
+        expect(jsContents).not.toContain('this.prop = void 0');
+        expect(jsContents).not.toContain('this.prop = undefined');
+      });
+
+      it('should not reinitialize a `declare` field across multiple inheritance levels', () => {
+        env.tsconfig();
+        env.write(
+          'test.ts',
+          `
+    import {Directive} from '@angular/core';
+
+    @Directive({})
+    export class GrandBase {
+      value: string|number = 'original';
+    }
+
+    @Directive({})
+    export class Base extends GrandBase {
+      declare value: string;
+    }
+
+    @Directive({selector: '[leaf]'})
+    export class Leaf extends Base {
+      declare value: string;
+    }
+  `,
+        );
+
+        env.driveMain();
+
+        const jsContents = env.getContents('test.js');
+        expect(jsContents).not.toContain('this.value = void 0');
+        expect(jsContents).not.toContain('this.value = undefined');
+      });
+
+      it('should not reinitialize a `declare` field in a child @Component', () => {
+        env.tsconfig();
+        env.write(
+          'test.ts',
+          `
+    import {Component, Directive} from '@angular/core';
+
+    @Directive({})
+    export class Base {
+      label: string|number = 'default';
+    }
+
+    @Component({
+      selector: 'child-cmp',
+      template: '{{ label }}',
+    })
+    export class ChildCmp extends Base {
+      declare label: string;
+    }
+  `,
+        );
+
+        env.driveMain();
+
+        // Same bug applies to @Component — the transform path is shared.
+        const jsContents = env.getContents('test.js');
+        expect(jsContents).not.toContain('this.label = void 0');
+        expect(jsContents).not.toContain('this.label = undefined');
+      });
+
+      it('should not reinitialize a `declare` field that also carries a non-Angular decorator', () => {
+        env.tsconfig();
+        env.write(
+          'test.ts',
+          `
+      import {Directive} from '@angular/core';
+
+      function Log(target: any, key: string): void {}
+
+      @Directive({})
+      export class Base {
+        status: string|number = 'active';
+      }
+
+      @Directive({selector: '[child]'})
+      export class Child extends Base {
+        @Log declare status: string;
+      }
+    `,
+        );
+
+        env.driveMain();
+
+        // Non-Angular decorators on a `declare` field must not trigger an initializer.
+        // The early-return guard in _stripAngularDecorators must still apply.
+        const jsContents = env.getContents('test.js');
+        expect(jsContents).not.toContain('this.status = void 0');
+        expect(jsContents).not.toContain('this.status = undefined');
+      });
     });
 
     describe('SVG animation processing', () => {

@@ -10,6 +10,7 @@ import ts from 'typescript';
 
 import {isAliasImportDeclaration, loadIsReferencedAliasDeclarationPatch} from '../../../imports';
 import {Decorator, ReflectionHost} from '../../../reflection';
+import {preserveAmbientFlag} from '../../src/ambient_flag';
 
 /**
  * Whether a given decorator should be treated as an Angular decorator.
@@ -664,6 +665,11 @@ function cloneClassElementWithModifiers(
   } else {
     throw new Error(`Unsupported decorated member with kind ${ts.SyntaxKind[node.kind]}`);
   }
+  // `ts.factory.create*` does not propagate NodeFlags from the original node.
+  // Re-apply the Ambient flag so that `declare` members (e.g. `declare prop: T`
+  // in a child directive) are not incorrectly emitted as field initializers.
+  // See: https://github.com/angular/angular/issues/68069
+  preserveAmbientFlag(node, clone);
 
   return ts.setOriginalNode(clone, node);
 }

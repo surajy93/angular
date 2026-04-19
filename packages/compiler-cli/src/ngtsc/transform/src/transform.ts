@@ -8,7 +8,7 @@
 
 import {ConstantPool} from '@angular/compiler';
 import ts from 'typescript';
-
+import {preserveAmbientFlag} from './ambient_flag';
 import {
   DefaultImportTracker,
   ImportRewriter,
@@ -344,7 +344,15 @@ class IvyTransformationVisitor extends Visitor {
         node.body,
       ) as T & ts.MethodDeclaration;
     } else if (ts.isPropertyDeclaration(node)) {
+      const allDecorators = ts.getDecorators(node);
+      const hasAngularDecorators =
+        allDecorators !== undefined &&
+        (nonCoreDecorators === undefined || nonCoreDecorators.length < allDecorators.length);
+      if (!hasAngularDecorators) {
+        return node as T;
+      }
       // Strip decorators of properties.
+      const originalNode = node;
       node = ts.factory.updatePropertyDeclaration(
         node,
         combinedModifiers,
@@ -353,6 +361,11 @@ class IvyTransformationVisitor extends Visitor {
         node.type,
         node.initializer,
       ) as T & ts.PropertyDeclaration;
+      // `updatePropertyDeclaration` creates a new node and resets NodeFlags.
+      // Re-apply Ambient so that `declare prop` in a child @Directive is not
+      // emitted as `this.prop = undefined`, which would clobber the parent
+      // initializer at runtime. See: https://github.com/angular/angular/issues/68069
+      preserveAmbientFlag(originalNode, node);
     } else if (ts.isGetAccessor(node)) {
       // Strip decorators of getters.
       node = ts.factory.updateGetAccessorDeclaration(

@@ -67,12 +67,23 @@ export class NgClassMigration extends TsurgeFunnelMigration<
     replacementCount: number;
     canRemoveNgClass: boolean;
     canRemoveCommonModule: boolean;
-  } | null {
+  } {
     const {migrated, changed, replacementCount, canRemoveNgClass, canRemoveCommonModule} =
       migrateNgClassBindings(template.content, this.config, node, typeChecker);
 
     if (!changed) {
-      return null;
+      // Even when no replacements were made, we must propagate the real `canRemoveNgClass`
+      // value. If the template contained [ngClass] bindings that could not be migrated (e.g.
+      // dynamic variable or array bindings), the visitor's `skippedNgClassCount` will be > 0
+      // and `canRemoveNgClass` will be false. Returning `true` here unconditionally would
+      // cause the migration to incorrectly strip `NgClass` from the component's `imports`
+      // array and from the top-level import statement.
+      return {
+        replacements: [],
+        replacementCount: 0,
+        canRemoveNgClass,
+        canRemoveCommonModule,
+      };
     }
 
     const fileToMigrate = template.inline
@@ -98,6 +109,10 @@ export class NgClassMigration extends TsurgeFunnelMigration<
     const templateVisitor = new NgComponentTemplateVisitor(typeChecker);
     templateVisitor.visitNode(node);
 
+    if (templateVisitor.resolvedTemplates.length === 0) {
+      return null;
+    }
+
     const replacements: Replacement[] = [];
     let replacementCount = 0;
     let canRemoveNgClass = true;
@@ -105,17 +120,10 @@ export class NgClassMigration extends TsurgeFunnelMigration<
 
     for (const template of templateVisitor.resolvedTemplates) {
       const result = this.processTemplate(template, node, file, info, typeChecker);
-      if (result === null) {
-        continue;
-      }
       replacements.push(...result.replacements);
       replacementCount += result.replacementCount;
       canRemoveNgClass = canRemoveNgClass && result.canRemoveNgClass;
       canRemoveCommonModule = canRemoveCommonModule && result.canRemoveCommonModule;
-    }
-
-    if (replacements.length === 0) {
-      return null;
     }
 
     // Handle the `@Component({ imports: [...] })` array.
@@ -166,7 +174,9 @@ export class NgClassMigration extends TsurgeFunnelMigration<
       }
 
       for (const {replacements, replacementCount} of classResults) {
-        ngClassReplacements.push({file, replacementCount, replacements});
+        if (replacements.length > 0) {
+          ngClassReplacements.push({file, replacementCount, replacements});
+        }
       }
 
       // A single source file may declare multiple classes/components. The top-level

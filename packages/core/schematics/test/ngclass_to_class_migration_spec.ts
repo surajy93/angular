@@ -195,6 +195,51 @@ describe('NgClass migration', () => {
     expect(content).toContain("import {NgClass} from '@angular/common';");
   });
 
+  it('should preserve the shared NgClass import when one of several components in the same file is completely skipped', async () => {
+    writeFile(
+      '/app.component.ts',
+      `
+        import {Component} from '@angular/core';
+        import {NgClass} from '@angular/common';
+
+        @Component({
+          selector: 'fully-migrated',
+          imports: [NgClass],
+          template: \`<div [ngClass]="{ active: isActive }">migrated</div>\`,
+        })
+        export class FullyMigrated {
+          isActive = true;
+        }
+
+        @Component({
+          selector: 'completely-skipped',
+          imports: [NgClass],
+          template: \`
+            <div [ngClass]="dynamicVar">skipped (dynamic)</div>
+          \`,
+        })
+        export class CompletelySkipped {
+          dynamicVar = 'class-a';
+        }
+      `,
+    );
+
+    await runMigration();
+
+    const content = tree.readContent('/app.component.ts');
+    const skippedIndex = content.indexOf("selector: 'completely-skipped'");
+    const fullyMigratedSection = content.slice(0, skippedIndex);
+    const completelySkippedSection = content.slice(skippedIndex);
+
+    expect(fullyMigratedSection).toContain('[class.active]="isActive"');
+    expect(fullyMigratedSection).not.toContain('imports:');
+
+    expect(completelySkippedSection).toContain('[ngClass]="dynamicVar"');
+    expect(completelySkippedSection).toContain('imports: [NgClass]');
+
+    expect(content).toContain("import {NgClass} from '@angular/common';");
+  });
+
   describe('No change cases', () => {
     it('should not change static HTML elements', async () => {
       writeFile(
@@ -747,6 +792,39 @@ describe('NgClass migration', () => {
       const content = tree.readContent('/app.component.ts');
 
       expect(content).toContain(`[class]="{'admin': isAdmin, dense: density === 'high'}"`);
+      expect(content).toContain('imports: [CommonModule]');
+      expect(content).toContain("import {CommonModule} from '@angular/common';");
+    });
+
+    it('should not remove CommonModule when a component has no [ngClass] but still uses *ngIf', async () => {
+      writeFile(
+        '/app.component.ts',
+        `
+        import {Component} from '@angular/core';
+        import {CommonModule} from '@angular/common';
+        @Component({
+          standalone: true,
+          imports: [CommonModule],
+          template: \`
+            <div *ngIf="condition">
+              <p>{{item}}</p>
+            </div>
+          \`
+        })
+        export class Cmp {
+          condition = true;
+        }
+      `,
+      );
+
+      await runMigration();
+
+      const content = tree.readContent('/app.component.ts');
+
+      // No [ngClass] binding exists, so nothing should be migrated in the template...
+      expect(content).toContain('*ngIf="condition"');
+      // ...but the component still needs `CommonModule` for `*ngIf`, so it must not be removed
+      // from either the `imports` array or the top-level import statement.
       expect(content).toContain('imports: [CommonModule]');
       expect(content).toContain("import {CommonModule} from '@angular/common';");
     });
